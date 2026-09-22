@@ -1,9 +1,18 @@
-name: Sync latest EXEs
+name: Sync latest trial EXEs
 
-# Pulls the newest release assets of every customer-facing VidaPay tool
+# Pulls ONLY the free-trial builds of every customer-facing VidaPay tool
 # from the private build repos into the central "latest" release of this
 # public repo, so 3sverse.com can serve versionless download links:
 #   https://github.com/abaduchanna/3sverse-downloads/releases/latest/download/<EXE>
+#
+# SECURITY CONTRACT (do not weaken):
+#   - This repo is PUBLIC. Only the 7-day TRIAL builds may ever be synced.
+#   - FULL (paid) builds and customer-specific variants stay in the PRIVATE
+#     build repos and are delivered through the order-number download
+#     gateway, never through this repo.
+#   - Only asset names explicitly listed in ALLOWED below are synced;
+#     everything else (FULL builds, paid variants, READMEs) is ignored.
+#   - Assets missing upstream are removed from the central release.
 #
 # Only assets whose digest changed are re-uploaded. Runs every 4 hours
 # and on demand (workflow_dispatch). 3S-verse-POS is intentionally NOT
@@ -36,10 +45,15 @@ jobs:
 
           TOKEN = os.environ["GH_TOKEN"]
           OWNER = "abaduchanna"
-          SOURCES = ["vidapay-rebate-filing", "vidapay-extractor",
-                     "vidapay-ordering"]
           CENTRAL = "3sverse-downloads"
           CENTRAL_TAG = "latest"
+
+          # EXACT trial asset allowlist — public repo carries trials only.
+          ALLOWED = {
+              "vidapay-rebate-filing": ["VidaPay_Rebate_Filing_TRIAL.exe"],
+              "vidapay-extractor": ["VidaPay_Incentive_Extractor_TRIAL.exe"],
+              "vidapay-ordering": ["VidaPay_Device_Ordering_TRIAL.exe"],
+          }
 
           os.makedirs("pkg_changed", exist_ok=True)
 
@@ -65,14 +79,18 @@ jobs:
               central_id = None
 
           changed = []
-          for repo in SOURCES:
+          upstream_names = set()
+          for repo, wanted in ALLOWED.items():
               rel = api(f"https://api.github.com/repos/{OWNER}/{repo}"
                         f"/releases/latest")
               print(f"{repo}: {rel.get('tag_name')}")
-              for a in rel.get("assets", []):
-                  name = a["name"]
-                  if not name.lower().endswith(".exe"):
+              by_name = {a["name"]: a for a in rel.get("assets", [])}
+              for name in wanted:
+                  a = by_name.get(name)
+                  if not a:
+                      print(f"  WAITING: {name} not published upstream yet")
                       continue
+                  upstream_names.add(name)
                   digest = a.get("digest") or ""
                   if name in central_assets and digest \
                           and central_assets[name][0] == digest:
@@ -84,17 +102,12 @@ jobs:
                       f.write(blob)
                   changed.append(name)
 
-          # remove central assets that no longer exist upstream
+          # remove central assets that are no longer part of the allowlist
+          # (or disappeared upstream) — protects against stale/leaked files
           if central_id:
-              upstream_names = set()
-              for repo in SOURCES:
-                  rel = api(f"https://api.github.com/repos/{OWNER}/{repo}"
-                            f"/releases/latest")
-                  upstream_names |= {a["name"] for a in rel.get("assets", [])
-                                     if a["name"].lower().endswith(".exe")}
               for name, (_d, aid) in central_assets.items():
                   if name not in upstream_names:
-                      print(f"  deleting stale central asset: {name}")
+                      print(f"  deleting disallowed/stale central asset: {name}")
                       req = urllib.request.Request(
                           f"https://api.github.com/repos/{OWNER}/{CENTRAL}"
                           f"/releases/assets/{aid}", method="DELETE",
@@ -111,24 +124,26 @@ jobs:
 
       - name: Nothing changed
         if: steps.collect.outputs.changed_count == '0'
-        run: echo "All assets are already up to date."
+        run: echo "All trial assets are already up to date."
 
       - name: Publish to the central latest release
         if: steps.collect.outputs.changed_count != '0'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest
-          name: Latest Builds (auto-synced)
+          name: Latest Trial Builds (auto-synced)
           body: |
-            Always-current Windows builds of the VidaPay dealer tools,
-            synced automatically from the official build pipelines.
+            Always-current **free 7-day trial** builds of the VidaPay dealer
+            tools, synced automatically from the official build pipelines.
 
-            - VidaPay Incentive Extractor (FULL = paid + built-in 7-day trial)
-            - VidaPay Device Ordering (FULL = paid + built-in 7-day trial)
-            - VidaPay Rebate Filing (single build, trial + license activation)
+            - VidaPay Incentive Extractor — TRIAL (7 days, 1 PC)
+            - VidaPay Device Ordering — TRIAL (7 days, 1 PC)
+            - VidaPay Rebate Filing — TRIAL (7 days, 1 PC)
 
             These files are referenced by the download buttons on
-            https://3sverse.com — one URL always serves the newest build,
-            so purchased customers re-download updates for free.
+            https://3sverse.com — one URL always serves the newest build.
+
+            Paid customers: use the order-number download on 3sverse.com
+            to get the FULL version and free updates for your package.
           files: pkg_changed/*.exe
           make_latest: true
