@@ -1,0 +1,134 @@
+name: Sync latest EXEs
+
+# Pulls the newest release assets of every customer-facing VidaPay tool
+# from the private build repos into the central "latest" release of this
+# public repo, so 3sverse.com can serve versionless download links:
+#   https://github.com/abaduchanna/3sverse-downloads/releases/latest/download/<EXE>
+#
+# Only assets whose digest changed are re-uploaded. Runs every 4 hours
+# and on demand (workflow_dispatch). 3S-verse-POS is intentionally NOT
+# synced (internal store tool).
+#
+# Required secret: SYNC_TOKEN - a GitHub PAT with contents:read on the
+# three source repos and contents:write on this repo.
+
+on:
+  schedule:
+    - cron: "0 */4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Collect changed assets from source releases
+        id: collect
+        env:
+          GH_TOKEN: ${{ secrets.SYNC_TOKEN }}
+        run: |
+          python3 - <<'PY'
+          import json, os, urllib.request
+
+          TOKEN = os.environ["GH_TOKEN"]
+          OWNER = "abaduchanna"
+          SOURCES = ["vidapay-rebate-filing", "vidapay-extractor",
+                     "vidapay-ordering"]
+          CENTRAL = "3sverse-downloads"
+          CENTRAL_TAG = "latest"
+
+          os.makedirs("pkg_changed", exist_ok=True)
+
+          def api(url, raw=False):
+              req = urllib.request.Request(url, headers={
+                  "Authorization": "Bearer " + TOKEN,
+                  "Accept": "application/octet-stream"
+                            if raw else "application/vnd.github+json",
+                  "User-Agent": "3sverse-downloads-sync"})
+              with urllib.request.urlopen(req, timeout=120) as r:
+                  return r.read() if raw else json.loads(r.read().decode())
+
+          # current central release + its asset digests (may not exist yet)
+          central_assets = {}
+          try:
+              rel = api(f"https://api.github.com/repos/{OWNER}/{CENTRAL}"
+                        f"/releases/tags/{CENTRAL_TAG}")
+              central_id = rel["id"]
+              for a in rel.get("assets", []):
+                  central_assets[a["name"]] = (a.get("digest") or "",
+                                               a["id"])
+          except Exception:
+              central_id = None
+
+          changed = []
+          for repo in SOURCES:
+              rel = api(f"https://api.github.com/repos/{OWNER}/{repo}"
+                        f"/releases/latest")
+              print(f"{repo}: {rel.get('tag_name')}")
+              for a in rel.get("assets", []):
+                  name = a["name"]
+                  if not name.lower().endswith(".exe"):
+                      continue
+                  digest = a.get("digest") or ""
+                  if name in central_assets and digest \
+                          and central_assets[name][0] == digest:
+                      print(f"  unchanged: {name}")
+                      continue
+                  print(f"  downloading: {name} ({a['size']//1048576} MB)")
+                  blob = api(a["url"], raw=True)
+                  with open(os.path.join("pkg_changed", name), "wb") as f:
+                      f.write(blob)
+                  changed.append(name)
+
+          # remove central assets that no longer exist upstream
+          if central_id:
+              upstream_names = set()
+              for repo in SOURCES:
+                  rel = api(f"https://api.github.com/repos/{OWNER}/{repo}"
+                            f"/releases/latest")
+                  upstream_names |= {a["name"] for a in rel.get("assets", [])
+                                     if a["name"].lower().endswith(".exe")}
+              for name, (_d, aid) in central_assets.items():
+                  if name not in upstream_names:
+                      print(f"  deleting stale central asset: {name}")
+                      req = urllib.request.Request(
+                          f"https://api.github.com/repos/{OWNER}/{CENTRAL}"
+                          f"/releases/assets/{aid}", method="DELETE",
+                          headers={"Authorization": "Bearer " + TOKEN,
+                                   "User-Agent": "3sverse-downloads-sync"})
+                      urllib.request.urlopen(req, timeout=60)
+
+          with open("changed.txt", "w") as f:
+              f.write("\n".join(changed))
+          print("changed assets:", len(changed))
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write("changed_count=%d\n" % len(changed))
+          PY
+
+      - name: Nothing changed
+        if: steps.collect.outputs.changed_count == '0'
+        run: echo "All assets are already up to date."
+
+      - name: Publish to the central latest release
+        if: steps.collect.outputs.changed_count != '0'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Latest Builds (auto-synced)
+          body: |
+            Always-current Windows builds of the VidaPay dealer tools,
+            synced automatically from the official build pipelines.
+
+            - VidaPay Incentive Extractor (FULL = paid + built-in 7-day trial)
+            - VidaPay Device Ordering (FULL = paid + built-in 7-day trial)
+            - VidaPay Rebate Filing (single build, trial + license activation)
+
+            These files are referenced by the download buttons on
+            https://3sverse.com — one URL always serves the newest build,
+            so purchased customers re-download updates for free.
+          files: pkg_changed/*.exe
+          make_latest: true
