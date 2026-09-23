@@ -3,7 +3,7 @@ name: Sync latest EXEs
 # Pulls the ONE official build of every customer-facing VidaPay tool
 # from the private build repos into the central "latest" release of this
 # public repo, so 3sverse.com can serve versionless download links:
-#   https://github.com/abaduchanna/3sverse-downloads/releases/latest/download/<EXE>
+#   https://github.com/abaduchanna/3SVerse_Downloads/releases/latest/download/<EXE>
 #
 # SINGLE-BUILD MODEL (since the trial/full merge):
 #   - Each build repo releases exactly one EXE per tool. It opens as a
@@ -49,7 +49,7 @@ jobs:
 
           TOKEN = os.environ["GH_TOKEN"]
           OWNER = "abaduchanna"
-          CENTRAL = "3sverse-downloads"
+          CENTRAL = "3SVerse_Downloads"
           CENTRAL_TAG = "latest"
 
           # EXACT allowlist — the one official build of each tool.
