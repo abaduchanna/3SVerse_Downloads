@@ -1,18 +1,22 @@
-name: Sync latest trial EXEs
+name: Sync latest EXEs
 
-# Pulls ONLY the free-trial builds of every customer-facing VidaPay tool
+# Pulls the ONE official build of every customer-facing VidaPay tool
 # from the private build repos into the central "latest" release of this
 # public repo, so 3sverse.com can serve versionless download links:
 #   https://github.com/abaduchanna/3sverse-downloads/releases/latest/download/<EXE>
 #
-# SECURITY CONTRACT (do not weaken):
-#   - This repo is PUBLIC. Only the 7-day TRIAL builds may ever be synced.
-#   - FULL (paid) builds and customer-specific variants stay in the PRIVATE
-#     build repos and are delivered through the order-number download
-#     gateway, never through this repo.
+# SINGLE-BUILD MODEL (since the trial/full merge):
+#   - Each build repo releases exactly one EXE per tool. It opens as a
+#     7-day free trial and unlocks permanently when the customer types
+#     their license key - trial users and paid customers run the same
+#     file, so there is no separate TRIAL/FULL pair to keep in sync.
+#   - License keys are only accepted after they verify against the
+#     seller's Ed25519 public keys (license_core), so the ledger client
+#     token embedded in the build cannot mint, extend or un-revoke a
+#     license. This is what makes the single build safe to host here.
 #   - Only asset names explicitly listed in ALLOWED below are synced;
-#     everything else (FULL builds, paid variants, READMEs) is ignored.
-#   - Assets missing upstream are removed from the central release.
+#     everything else (paid variants, READMEs, old TRIAL/FULL names) is
+#     ignored AND removed from the central release automatically.
 #
 # Only assets whose digest changed are re-uploaded. Runs every 4 hours
 # and on demand (workflow_dispatch). 3S-verse-POS is intentionally NOT
@@ -48,11 +52,11 @@ jobs:
           CENTRAL = "3sverse-downloads"
           CENTRAL_TAG = "latest"
 
-          # EXACT trial asset allowlist — public repo carries trials only.
+          # EXACT allowlist — the one official build of each tool.
           ALLOWED = {
-              "vidapay-rebate-filing": ["VidaPay_Rebate_Filing_TRIAL.exe"],
-              "vidapay-extractor": ["VidaPay_Incentive_Extractor_TRIAL.exe"],
-              "vidapay-ordering": ["VidaPay_Device_Ordering_TRIAL.exe"],
+              "vidapay-rebate-filing": ["VidaPay_Rebate_Filing.exe"],
+              "vidapay-extractor": ["VidaPay_Incentive_Extractor.exe"],
+              "vidapay-ordering": ["VidaPay_Device_Ordering.exe"],
           }
 
           os.makedirs("pkg_changed", exist_ok=True)
@@ -103,7 +107,8 @@ jobs:
                   changed.append(name)
 
           # remove central assets that are no longer part of the allowlist
-          # (or disappeared upstream) — protects against stale/leaked files
+          # (or disappeared upstream) — retires the old TRIAL/FULL names
+          # and protects against stale/leaked files
           if central_id:
               for name, (_d, aid) in central_assets.items():
                   if name not in upstream_names:
@@ -124,26 +129,27 @@ jobs:
 
       - name: Nothing changed
         if: steps.collect.outputs.changed_count == '0'
-        run: echo "All trial assets are already up to date."
+        run: echo "All assets are already up to date."
 
       - name: Publish to the central latest release
         if: steps.collect.outputs.changed_count != '0'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest
-          name: Latest Trial Builds (auto-synced)
+          name: Latest Builds (auto-synced)
           body: |
-            Always-current **free 7-day trial** builds of the VidaPay dealer
-            tools, synced automatically from the official build pipelines.
+            Always-current **official builds** of the VidaPay dealer tools,
+            synced automatically from the official build pipelines.
 
-            - VidaPay Incentive Extractor — TRIAL (7 days, 1 PC)
-            - VidaPay Device Ordering — TRIAL (7 days, 1 PC)
-            - VidaPay Rebate Filing — TRIAL (7 days, 1 PC)
+            One build per tool — it opens as a **free 7-day trial** and a
+            license key unlocks the full version permanently:
+
+            - VidaPay Incentive Extractor
+            - VidaPay Device Ordering
+            - VidaPay Rebate Filing
 
             These files are referenced by the download buttons on
-            https://3sverse.com — one URL always serves the newest build.
-
-            Paid customers: use the order-number download on 3sverse.com
-            to get the FULL version and free updates for your package.
+            https://3sverse.com — one URL always serves the newest build,
+            and paid customers re-download updates here free.
           files: pkg_changed/*.exe
           make_latest: true

@@ -12,12 +12,15 @@ a single versionless URL always serves the newest build:
 https://github.com/abaduchanna/3sverse-downloads/releases/latest/download/<EXE-NAME>.exe
 ```
 
-| Product | Paid / licensed build | Trial build |
-|---------|----------------------|-------------|
-| VidaPay Incentive Extractor | `VidaPay_Incentive_Extractor_FULL.exe` | `VidaPay_Incentive_Extractor_TRIAL.exe` |
-| VidaPay Device Ordering | `VidaPay_Device_Ordering_FULL.exe` | `VidaPay_Device_Ordering_TRIAL.exe` |
-| VidaPay Rebate Filing | `VidaPay_Rebate_Filing.exe` | same file (7-day trial built in) |
+| Product | One build for everyone |
+|---------|------------------------|
+| VidaPay Incentive Extractor | `VidaPay_Incentive_Extractor.exe` |
+| VidaPay Device Ordering | `VidaPay_Device_Ordering.exe` |
+| VidaPay Rebate Filing | `VidaPay_Rebate_Filing.exe` |
 
+- There is ONE build per tool: it opens as a free 7-day trial, and a
+  license key unlocks the full version permanently. Trial users and
+  paid customers run the same file.
 - Downloading is free. Using it beyond the built-in 7-day trial requires
   a license key, issued by 3S Verse and activated on one PC.
 - Monthly / annual / lifetime customers re-download updates free: open
@@ -25,6 +28,14 @@ https://github.com/abaduchanna/3sverse-downloads/releases/latest/download/<EXE-N
   the download buttons there.
 - `3S-verse-POS` is an internal store tool and is intentionally not
   mirrored here.
+
+## Why hosting the paid-capable build publicly is safe
+
+The build embeds a scoped ledger client token used for license
+activation and revocation checks. It cannot mint or extend licenses:
+every key is accepted only after its Ed25519 signature (produced by the
+seller's offline keygen) verifies against the seller-published public
+keys in `license_core`. The signing keys never ship with any build.
 
 ## Setup note
 
