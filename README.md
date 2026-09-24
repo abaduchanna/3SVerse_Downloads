@@ -40,6 +40,6 @@ keys in `license_core`. The signing keys never ship with any build.
 ## Setup note
 
 The sync workflow needs one repo secret, `SYNC_TOKEN` (a GitHub PAT
-with contents:read on `vidapay-rebate-filing`, `vidapay-extractor`,
-`vidapay-ordering` and contents:write here). Trigger the sync manually
+with contents:read on `VidaPay_Rebate_Filing`, `VidaPay_Incentive_Extractor`,
+`VidaPay_Device_Ordering` and contents:write here). Trigger the sync manually
 from the Actions tab → "Sync latest EXEs" → Run workflow.

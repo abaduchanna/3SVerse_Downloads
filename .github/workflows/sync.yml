@@ -54,9 +54,9 @@ jobs:
 
           # EXACT allowlist — the one official build of each tool.
           ALLOWED = {
-              "vidapay-rebate-filing": ["VidaPay_Rebate_Filing.exe"],
-              "vidapay-extractor": ["VidaPay_Incentive_Extractor.exe"],
-              "vidapay-ordering": ["VidaPay_Device_Ordering.exe"],
+              "VidaPay_Rebate_Filing": ["VidaPay_Rebate_Filing.exe"],
+              "VidaPay_Incentive_Extractor": ["VidaPay_Incentive_Extractor.exe"],
+              "VidaPay_Device_Ordering": ["VidaPay_Device_Ordering.exe"],
           }
 
           os.makedirs("pkg_changed", exist_ok=True)
