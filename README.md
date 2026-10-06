@@ -1,4 +1,4 @@
-# 3S Verse — Downloads
+# 3SVerse — Downloads
 
 Public, always-current Windows builds of the VidaPay dealer tools.
 Developed by www.3SVerse.com
@@ -22,7 +22,7 @@ https://github.com/abaduchanna/3sverse-downloads/releases/latest/download/<EXE-N
   license key unlocks the full version permanently. Trial users and
   paid customers run the same file.
 - Downloading is free. Using it beyond the built-in 7-day trial requires
-  a license key, issued by 3S Verse and activated on one PC.
+  a license key, issued by 3SVerse and activated on one PC.
 - Monthly / annual / lifetime customers re-download updates free: open
   your order status page on 3sverse.com with your order number and use
   the download buttons there.
